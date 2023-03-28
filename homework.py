@@ -8,6 +8,7 @@ import telegram
 import exceptions
 
 
+from typing import Union
 from dotenv import load_dotenv
 from http import HTTPStatus
 
@@ -41,7 +42,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def check_tokens():
+def check_tokens() -> bool:
     """
     Функция проверяет доступность переменных окружения.
 
@@ -57,7 +58,7 @@ def check_tokens():
     return True
 
 
-def get_api_answer(timestamp):
+def get_api_answer(timestamp: int) -> Union[dict, Exception]:
     """
     Функция производит запрос к эндпоинту API-сервиса.
 
@@ -66,10 +67,9 @@ def get_api_answer(timestamp):
     Result:
         dict - JSON-ответ API-сервиса в виде словаря.
     """
-    params = {'from_date': timestamp}
-    all_params = dict(url=ENDPOINT, headers=HEADERS, params=params)
+    payload = {'from_date': timestamp}
     try:
-        response = requests.get(**all_params)
+        response = requests.get(url=ENDPOINT, headers=HEADERS, params=payload)
         if response.status_code != HTTPStatus.OK:
             logging.error(
                 f'Ошибка при запросе к эндпоинту API-сервиса. '
@@ -79,9 +79,11 @@ def get_api_answer(timestamp):
 
     except json.decoder.JSONDecodeError as error:
         logging.error(f'Ошибка при декодировании JSON: {error}.')
+        return error
 
     except requests.exceptions.ConnectionError as error:
         logging.error(f'Ошибка соединения: {error}.')
+        return error
 
     except Exception as error:
         logging.error(f'Ошибка при запросе к основному API: {error}.')
@@ -91,7 +93,7 @@ def get_api_answer(timestamp):
         return response.json()
 
 
-def check_response(response):
+def check_response(response: dict) -> dict:
     """
     Функция проверяет соответствие ответа API ожидаемому значению.
 
@@ -107,11 +109,21 @@ def check_response(response):
             f'Код: {response["code"]}.'
         )
 
-    if 'homeworks' not in response:
+    if not isinstance(response, dict):
         logging.error(
-            'Некоректный формат ответа API. Отсутствует ключ "homeworks".'
+            'Некорректный формат ответа API. '
+            'Объект "response" должен быть словарём.'
         )
         raise TypeError(
+            'Некорректный формат ответа API. '
+            'Данные приходят не в виде словаря.'
+        )
+
+    if 'homeworks' not in response:
+        logging.error(
+            'Некорректный формат ответа API. Отсутствует ключ "homeworks".'
+        )
+        raise KeyError(
             'Структура данных не соответствует ожиданиям. '
             'Отсутствует ключ "homeworks".'
         )
@@ -123,7 +135,6 @@ def check_response(response):
         )
         raise TypeError(
             'Некорректный формат ответа API. Данные приходят не в виде списка.'
-            'Данные приходят не в виде списка.'
         )
 
     if response['homeworks']:
@@ -134,7 +145,7 @@ def check_response(response):
         raise IndexError(exceptions.HOMEWORS_LIST_IS_EMPTY)
 
 
-def parse_status(homework):
+def parse_status(homework: dict) -> str:
     """
     Функция извлекает из ответа API статус проверки домашней работы.
 
@@ -161,7 +172,7 @@ def parse_status(homework):
     return message
 
 
-def send_message(bot, message):
+def send_message(bot: telegram.Bot, message: str) -> None:
     """
     Функция отправляет сообщение о статусе домашней работы пользователю.
 
@@ -183,9 +194,10 @@ def main():
     status_check = ''
 
     if not check_tokens():
-        raise exceptions.VariableError(
+        logging.critical(
             'Ошибка. Отсутствует одна или несколько переменных окружения.'
         )
+        sys.exit()
 
     while True:
         try:
