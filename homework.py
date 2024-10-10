@@ -67,7 +67,7 @@ def get_api_answer(timestamp: int) -> Union[dict, Exception]:
     Result:
         dict - JSON-ответ API-сервиса в виде словаря.
     """
-    payload = {'from_date': timestamp}
+    payload = {'from_date': 1678502400}
     try:
         response = requests.get(url=ENDPOINT, headers=HEADERS, params=payload)
         if response.status_code != HTTPStatus.OK:
